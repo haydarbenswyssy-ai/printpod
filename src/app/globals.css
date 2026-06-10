@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-tertiary: #1a1a1a;
+  --bg-card: #141414;
+  --bg-elevated: #1e1e1e;
+  --text-primary: #f5f5f5;
+  --text-secondary: #a0a0a0;
+  --text-muted: #666666;
+  --accent: #e0ff00;
+  --accent-hover: #d4f000;
+  --accent-dim: rgba(224, 255, 0, 0.1);
+  --border: #222222;
+  --border-hover: #333333;
+  --danger: #ff4444;
+  --success: #00cc88;
+  --warning: #ffaa00;
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-dm-sans), sans-serif;
+  --font-display: var(--font-bebas), sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-dm-sans), sans-serif;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Noise texture overlay */
+.noise-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+/* Glow effect */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(224, 255, 0, 0.15), 0 0 60px rgba(224, 255, 0, 0.05);
+}
+
+/* Smooth page transitions */
+.page-enter {
+  animation: fadeUp 0.4s ease-out;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(224, 255, 0, 0.1); }
+  50% { box-shadow: 0 0 40px rgba(224, 255, 0, 0.2); }
+}
+
+/* Prevent design image downloading */
+.no-download {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.design-protected {
+  position: relative;
+}
+.design-protected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+
+/* Grid pattern background */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Gradient mesh */
+.mesh-gradient {
+  background:
+    radial-gradient(at 20% 80%, rgba(224, 255, 0, 0.06) 0%, transparent 50%),
+    radial-gradient(at 80% 20%, rgba(224, 255, 0, 0.04) 0%, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+}
