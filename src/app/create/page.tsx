@@ -194,23 +194,39 @@ export default function CreatePage() {
         }
       }
 
-      // Upload images if they exist
+      // Upload images if they exist.
+      // Previews go to the PUBLIC "previews" bucket so they display on the
+      // marketplace, product pages and admin. Print-ready design files go to
+      // the PRIVATE "designs" bucket (admin downloads them for production).
       let design_front_url, design_back_url, preview_front_url, preview_back_url;
 
       if (frontPreview) {
         const blob = await (await fetch(frontPreview)).blob();
-        const file = new File([blob], 'front-design.png', { type: 'image/png' });
-        const res = await api.uploadImage(file, 'designs');
-        design_front_url = res.url;
-        preview_front_url = res.url;
+        const previewRes = await api.uploadImage(
+          new File([blob], 'front-preview.png', { type: 'image/png' }),
+          'previews'
+        );
+        if (previewRes?.message && !previewRes?.url) throw new Error(previewRes.message);
+        const designRes = await api.uploadImage(
+          new File([blob], 'front-design.png', { type: 'image/png' }),
+          'designs'
+        );
+        preview_front_url = previewRes.url;
+        design_front_url = designRes.url || previewRes.url;
       }
 
       if (backPreview) {
         const blob = await (await fetch(backPreview)).blob();
-        const file = new File([blob], 'back-design.png', { type: 'image/png' });
-        const res = await api.uploadImage(file, 'designs');
-        design_back_url = res.url;
-        preview_back_url = res.url;
+        const previewRes = await api.uploadImage(
+          new File([blob], 'back-preview.png', { type: 'image/png' }),
+          'previews'
+        );
+        const designRes = await api.uploadImage(
+          new File([blob], 'back-design.png', { type: 'image/png' }),
+          'designs'
+        );
+        preview_back_url = previewRes.url;
+        design_back_url = designRes.url || previewRes.url;
       }
 
       await api.createProduct({

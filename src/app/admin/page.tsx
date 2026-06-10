@@ -19,6 +19,7 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [productFilter, setProductFilter] = useState<string>('pending');
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function AdminPage() {
 
   async function loadData() {
     setLoading(true);
+    setLoadError(null);
     try {
       if (tab === 'overview') {
         const data = await api.adminGetStats();
@@ -43,8 +45,8 @@ export default function AdminPage() {
         const data = await api.adminGetUsers();
         setUsers(data.users);
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      setLoadError(err?.message || 'Failed to load data. Try signing out and back in.');
     } finally {
       setLoading(false);
     }
@@ -92,6 +94,12 @@ export default function AdminPage() {
           </button>
         ))}
       </div>
+
+      {loadError && (
+        <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+          {loadError}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-[var(--text-muted)]" /></div>

@@ -39,14 +39,8 @@ export const api = {
     request<{ products: any[]; total: number }>(`/products${params ? `?${params}` : ''}`),
   getProduct: (id: string) =>
     request<{ product: any }>(`/products/${id}`),
-  createProduct: (data: FormData) =>
-    fetch(`${API_BASE}/products`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${JSON.parse(localStorage.getItem('printpod-auth') || '{}')?.state?.token}`,
-      },
-      body: data,
-    }).then((r) => r.json()),
+  createProduct: (data: Record<string, any>) =>
+    request<{ product: any }>('/products', { method: 'POST', body: JSON.stringify(data) }),
   updateProduct: (id: string, data: any) =>
     request<{ product: any }>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 

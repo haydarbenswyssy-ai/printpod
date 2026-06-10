@@ -96,8 +96,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ product }, { status: 201 });
     }
 
+    // In Supabase, `profit` is a GENERATED ALWAYS column — it must NOT be in
+    // the insert payload or the insert is rejected.
+    const { profit, ...supabaseData } = productData;
     const supabase = getServiceClient();
-    const { data, error: dbError } = await supabase.from('products').insert(productData).select('*').single();
+    const { data, error: dbError } = await supabase.from('products').insert(supabaseData).select('*').single();
     if (dbError) throw dbError;
     await supabase.from('users').update({ role: 'seller' }).eq('id', user!.sub).eq('role', 'customer');
     return NextResponse.json({ product: data }, { status: 201 });
