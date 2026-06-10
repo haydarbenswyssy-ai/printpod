@@ -60,6 +60,7 @@ export default function CreatePage() {
       });
 
       fabricRef.current = canvas;
+      if (typeof window !== 'undefined') (window as any).__printpodCanvas = canvas;
       setCanvasReady(true);
     })();
 
@@ -107,10 +108,12 @@ export default function CreatePage() {
       const maxSize = 200;
       const scale = Math.min(maxSize / img.width!, maxSize / img.height!);
       img.scale(scale);
-      img.set({ left: 100, top: 100 });
       fabricRef.current.add(img);
+      // Drop new artwork in the middle of the tee (chest area)
+      fabricRef.current.centerObject(img);
+      img.setCoords();
       fabricRef.current.setActiveObject(img);
-      fabricRef.current.renderAll();
+      fabricRef.current.requestRenderAll();
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -123,15 +126,16 @@ export default function CreatePage() {
     const fabric = fabricModule.default || fabricModule;
 
     const text = new fabric.IText(textInput, {
-      left: 100,
-      top: 150,
       fontSize: fontSize,
       fill: textColor,
       fontFamily: 'Arial',
     });
     fabricRef.current.add(text);
+    // Center new text on the tee
+    fabricRef.current.centerObject(text);
+    text.setCoords();
     fabricRef.current.setActiveObject(text);
-    fabricRef.current.renderAll();
+    fabricRef.current.requestRenderAll();
     setTextInput('');
   }
 
