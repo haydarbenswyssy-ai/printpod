@@ -43,6 +43,8 @@ export const api = {
     request<{ product: any }>('/products', { method: 'POST', body: JSON.stringify(data) }),
   updateProduct: (id: string, data: any) =>
     request<{ product: any }>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteProduct: (id: string) =>
+    request<{ deleted: boolean; unlisted?: boolean; message?: string }>(`/products/${id}`, { method: 'DELETE' }),
 
   // Stores
   getStore: (username: string) =>

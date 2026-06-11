@@ -31,6 +31,9 @@ export default function CreatePage() {
   const [textInput, setTextInput] = useState('');
   const [textColor, setTextColor] = useState('#ffffff');
   const [fontSize, setFontSize] = useState(32);
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
 
   // Product form
   const [title, setTitle] = useState('');
@@ -128,7 +131,9 @@ export default function CreatePage() {
     const text = new fabric.IText(textInput, {
       fontSize: fontSize,
       fill: textColor,
-      fontFamily: 'Arial',
+      fontFamily: fontFamily,
+      fontWeight: isBold ? 'bold' : 'normal',
+      fontStyle: isItalic ? 'italic' : 'normal',
     });
     fabricRef.current.add(text);
     // Center new text on the tee
@@ -137,6 +142,17 @@ export default function CreatePage() {
     fabricRef.current.setActiveObject(text);
     fabricRef.current.requestRenderAll();
     setTextInput('');
+  }
+
+  // Live-update the selected text object when a style control changes.
+  function styleSelectedText(props: Record<string, any>) {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (active && (active.type === 'i-text' || active.type === 'text' || active.type === 'textbox')) {
+      active.set(props);
+      canvas.requestRenderAll();
+    }
   }
 
   // Delete selected
@@ -151,11 +167,51 @@ export default function CreatePage() {
     }
   }
 
-  // Export canvas as image
-  function getCanvasImage(): string | null {
+  // Export the design only (transparent background) — used as the print file.
+  function getDesignImage(): string | null {
     const canvas = fabricRef.current;
     if (!canvas || canvas.getObjects().length === 0) return null;
     return canvas.toDataURL({ format: 'png', quality: 1, multiplier: 2 });
+  }
+
+  // Composite the t-shirt mockup + the design into ONE image — used as the
+  // public preview so the design always shows ON the tee everywhere.
+  async function getCompositeImage(side: 'front' | 'back', designDataUrl: string | null): Promise<string> {
+    const SIZE = 800;
+    const out = document.createElement('canvas');
+    out.width = SIZE;
+    out.height = SIZE;
+    const ctx = out.getContext('2d')!;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // Draw the t-shirt mockup with "contain" fit (matches the editor).
+    const tee = new Image();
+    await new Promise<void>((resolve) => {
+      tee.onload = () => resolve();
+      tee.onerror = () => resolve();
+      tee.src = `/tshirt/${side}.png`;
+    });
+    if (tee.width && tee.height) {
+      const scale = Math.min(SIZE / tee.width, SIZE / tee.height);
+      const dw = tee.width * scale;
+      const dh = tee.height * scale;
+      ctx.drawImage(tee, (SIZE - dw) / 2, (SIZE - dh) / 2, dw, dh);
+    }
+
+    // Draw the design on top (editor canvas fills the same square box).
+    if (designDataUrl) {
+      const design = new Image();
+      await new Promise<void>((resolve) => {
+        design.onload = () => resolve();
+        design.onerror = () => resolve();
+        design.src = designDataUrl;
+      });
+      ctx.drawImage(design, 0, 0, SIZE, SIZE);
+    }
+
+    return out.toDataURL('image/png');
   }
 
   // Publish product
@@ -168,65 +224,58 @@ export default function CreatePage() {
 
     setPublishing(true);
     try {
-      // Save current side
       const canvas = fabricRef.current;
-      if (canvas) {
-        const currentJSON = JSON.stringify(canvas.toJSON());
-        if (activeSide === 'front') setFrontJSON(currentJSON);
-        else setBackJSON(currentJSON);
-      }
 
-      // Get preview images
-      const frontPreview = getCanvasImage();
+      // Capture the JSON for each side (current side is in the live canvas).
+      const currentJSON = canvas ? JSON.stringify(canvas.toJSON()) : null;
+      const frontData = activeSide === 'front' ? currentJSON : frontJSON;
+      const backData = activeSide === 'back' ? currentJSON : backJSON;
+      if (activeSide === 'front') setFrontJSON(currentJSON);
+      else setBackJSON(currentJSON);
 
-      // Switch to back, get image, switch back
-      let backPreview: string | null = null;
-      if (backJSON) {
-        const savedFront = canvas ? JSON.stringify(canvas.toJSON()) : null;
-        if (canvas && backJSON) {
-          await canvas.loadFromJSON(JSON.parse(backJSON));
+      // Render the design-only PNG + the composite (design on tee) for a side.
+      async function renderSide(side: 'front' | 'back', data: string | null) {
+        if (!canvas) return { design: null as string | null, composite: await getCompositeImage(side, null) };
+        if (data) {
+          await canvas.loadFromJSON(JSON.parse(data));
           canvas.renderAll();
-          backPreview = getCanvasImage();
-          if (savedFront) {
-            await canvas.loadFromJSON(JSON.parse(savedFront));
-            canvas.renderAll();
-          }
+        } else {
+          canvas.clear();
+          canvas.renderAll();
         }
+        const design = getDesignImage();
+        const composite = await getCompositeImage(side, design);
+        return { design, composite };
       }
 
-      // Upload images if they exist.
-      // Previews go to the PUBLIC "previews" bucket so they display on the
-      // marketplace, product pages and admin. Print-ready design files go to
-      // the PRIVATE "designs" bucket (admin downloads them for production).
+      const front = await renderSide('front', frontData);
+      const hasBack = !!backData;
+      const back = hasBack ? await renderSide('back', backData) : { design: null, composite: null };
+
+      // Restore the side the user was editing.
+      if (canvas && currentJSON) {
+        await canvas.loadFromJSON(JSON.parse(currentJSON));
+        canvas.renderAll();
+      }
+
+      // Upload. Previews → PUBLIC "previews" bucket (shown everywhere).
+      // Design files → PRIVATE "designs" bucket (admin downloads for printing).
       let design_front_url, design_back_url, preview_front_url, preview_back_url;
 
-      if (frontPreview) {
-        const blob = await (await fetch(frontPreview)).blob();
-        const previewRes = await api.uploadImage(
-          new File([blob], 'front-preview.png', { type: 'image/png' }),
-          'previews'
-        );
-        if (previewRes?.message && !previewRes?.url) throw new Error(previewRes.message);
-        const designRes = await api.uploadImage(
-          new File([blob], 'front-design.png', { type: 'image/png' }),
-          'designs'
-        );
-        preview_front_url = previewRes.url;
-        design_front_url = designRes.url || previewRes.url;
+      async function upload(dataUrl: string, name: string, bucket: string) {
+        const blob = await (await fetch(dataUrl)).blob();
+        const res = await api.uploadImage(new File([blob], name, { type: 'image/png' }), bucket);
+        if (res?.message && !res?.url) throw new Error(res.message);
+        return res.url as string;
       }
 
-      if (backPreview) {
-        const blob = await (await fetch(backPreview)).blob();
-        const previewRes = await api.uploadImage(
-          new File([blob], 'back-preview.png', { type: 'image/png' }),
-          'previews'
-        );
-        const designRes = await api.uploadImage(
-          new File([blob], 'back-design.png', { type: 'image/png' }),
-          'designs'
-        );
-        preview_back_url = previewRes.url;
-        design_back_url = designRes.url || previewRes.url;
+      // Front preview always exists (tee is always drawn).
+      preview_front_url = await upload(front.composite, 'front-preview.png', 'previews');
+      if (front.design) design_front_url = await upload(front.design, 'front-design.png', 'designs');
+
+      if (hasBack && back.composite) {
+        preview_back_url = await upload(back.composite, 'back-preview.png', 'previews');
+        if (back.design) design_back_url = await upload(back.design, 'back-design.png', 'designs');
       }
 
       await api.createProduct({
@@ -384,24 +433,59 @@ export default function CreatePage() {
                   className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] mb-3"
                   onKeyDown={(e) => e.key === 'Enter' && addText()}
                 />
-                <div className="flex items-center gap-3 mb-3">
+                {/* Font family */}
+                <select
+                  value={fontFamily}
+                  onChange={(e) => {
+                    setFontFamily(e.target.value);
+                    styleSelectedText({ fontFamily: e.target.value });
+                  }}
+                  className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] mb-3"
+                  style={{ fontFamily }}
+                >
+                  {['Arial', 'Impact', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Trebuchet MS', 'Comic Sans MS'].map((f) => (
+                    <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                  ))}
+                </select>
+
+                <div className="flex items-center gap-3 mb-3 flex-wrap">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-[var(--text-muted)]">Color:</span>
                     <input
                       type="color"
                       value={textColor}
-                      onChange={(e) => setTextColor(e.target.value)}
+                      onChange={(e) => {
+                        setTextColor(e.target.value);
+                        styleSelectedText({ fill: e.target.value });
+                      }}
                       className="w-8 h-8 rounded border border-[var(--border)] cursor-pointer"
                     />
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-[var(--text-muted)]">Size:</span>
-                    <button onClick={() => setFontSize(Math.max(12, fontSize - 4))} className="p-1 rounded hover:bg-[var(--bg-tertiary)]">
+                    <button onClick={() => { const s = Math.max(12, fontSize - 4); setFontSize(s); styleSelectedText({ fontSize: s }); }} className="p-1 rounded hover:bg-[var(--bg-tertiary)]">
                       <Minus className="w-3 h-3" />
                     </button>
                     <span className="text-xs w-6 text-center">{fontSize}</span>
-                    <button onClick={() => setFontSize(Math.min(80, fontSize + 4))} className="p-1 rounded hover:bg-[var(--bg-tertiary)]">
+                    <button onClick={() => { const s = Math.min(80, fontSize + 4); setFontSize(s); styleSelectedText({ fontSize: s }); }} className="p-1 rounded hover:bg-[var(--bg-tertiary)]">
                       <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                  {/* Bold (gras) / Italic toggles */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { const v = !isBold; setIsBold(v); styleSelectedText({ fontWeight: v ? 'bold' : 'normal' }); }}
+                      className={`w-8 h-8 rounded-lg border text-sm font-bold transition-colors ${isBold ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'}`}
+                      title="Bold (gras)"
+                    >
+                      B
+                    </button>
+                    <button
+                      onClick={() => { const v = !isItalic; setIsItalic(v); styleSelectedText({ fontStyle: v ? 'italic' : 'normal' }); }}
+                      className={`w-8 h-8 rounded-lg border text-sm italic transition-colors ${isItalic ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'}`}
+                      title="Italic"
+                    >
+                      I
                     </button>
                   </div>
                 </div>

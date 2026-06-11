@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import { api } from '@/lib/api';
-import { Users, Package, ShoppingBag, Clock, Check, X, Loader2, Banknote } from 'lucide-react';
+import { Users, Package, ShoppingBag, Clock, Check, X, Loader2, Banknote, Trash2 } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
 
 type Tab = 'overview' | 'products' | 'orders' | 'users';
@@ -59,6 +59,17 @@ export default function AdminPage() {
 
   async function updateOrderStatus(id: string, status: string) {
     await api.adminUpdateOrder(id, { status });
+    loadData();
+  }
+
+  async function deleteProduct(id: string, title: string) {
+    if (!window.confirm(`Delete "${title}" permanently? This cannot be undone.`)) return;
+    try {
+      const res = await api.deleteProduct(id);
+      if (res.unlisted) alert(res.message);
+    } catch (err: any) {
+      alert(err?.message || 'Delete failed');
+    }
     loadData();
   }
 
@@ -141,11 +152,11 @@ export default function AdminPage() {
                 <div className="space-y-3">
                   {products.map((p) => (
                     <div key={p.id} className="flex gap-4 p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)]">
-                      <div className={`w-20 h-20 rounded-xl flex-shrink-0 flex items-center justify-center ${p.tshirt_color === 'black' ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'}`}>
+                      <div className="w-20 h-20 rounded-xl flex-shrink-0 flex items-center justify-center bg-white overflow-hidden">
                         {p.preview_front_url ? (
-                          <img src={p.preview_front_url} alt="" className="w-12 h-12 object-contain no-download" draggable={false} />
+                          <img src={p.preview_front_url} alt="" className="w-full h-full object-contain no-download" draggable={false} onContextMenu={(e) => e.preventDefault()} />
                         ) : (
-                          <Package className="w-6 h-6 text-[var(--text-muted)]" />
+                          <img src="/tshirt/front.png" alt="" className="w-full h-full object-contain opacity-60" draggable={false} />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -188,6 +199,13 @@ export default function AdminPage() {
                             Unlist
                           </button>
                         )}
+                        <button
+                          onClick={() => deleteProduct(p.id, p.title)}
+                          className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ))}

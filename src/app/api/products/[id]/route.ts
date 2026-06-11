@@ -56,3 +56,49 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const { user, error } = requireAuth(req);
+    if (error) return error;
+
+    const supabase = getServiceClient();
+
+    const { data: existing } = await supabase
+      .from('products')
+      .select('seller_id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ message: 'Product not found' }, { status: 404 });
+    }
+    if (existing.seller_id !== user!.sub && user!.role !== 'admin') {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    const { error: delError } = await supabase.from('products').delete().eq('id', id);
+
+    if (delError) {
+      // FK violation: the product has order history (order_items reference it).
+      // We can't hard-delete without losing order records — unlist it instead.
+      if (delError.code === '23503') {
+        await supabase
+          .from('products')
+          .update({ status: 'rejected', updated_at: new Date().toISOString() })
+          .eq('id', id);
+        return NextResponse.json({
+          deleted: false,
+          unlisted: true,
+          message: 'Product has existing orders, so it was unlisted instead of deleted.',
+        });
+      }
+      throw delError;
+    }
+
+    return NextResponse.json({ deleted: true });
+  } catch (error: any) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+}

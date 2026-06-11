@@ -123,15 +123,10 @@ function DashboardContent() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {products.map((product) => (
             <div key={product.id} className="group block">
-              <div className={`relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] ${product.tshirt_color === 'black' ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'}`}>
-                <svg viewBox="0 0 200 220" className="absolute inset-0 w-full h-full p-8 opacity-25">
-                  <path d="M60,10 L30,30 L10,70 L35,80 L45,50 L45,210 L155,210 L155,50 L165,80 L190,70 L170,30 L140,10 L120,20 C110,28 90,28 80,20 Z" fill={product.tshirt_color === 'black' ? '#2a2a2a' : '#e0e0e0'} />
-                </svg>
-                {product.preview_front_url && (
-                  <div className="absolute inset-0 flex items-center justify-center design-protected">
-                    <img src={product.preview_front_url} alt="" className="w-[40%] h-auto no-download" draggable={false} />
-                  </div>
-                )}
+              <div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-white">
+                <div className="absolute inset-0 flex items-center justify-center design-protected">
+                  <img src={product.preview_front_url || '/tshirt/front.png'} alt={product.title} className="w-full h-full object-contain no-download" draggable={false} onContextMenu={(e) => e.preventDefault()} />
+                </div>
                 <div className="absolute top-2 right-2">
                   <span className={`px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium rounded-md border ${STATUS_BADGE[product.status]}`}>
                     {product.status}

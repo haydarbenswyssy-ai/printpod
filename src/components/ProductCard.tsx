@@ -7,34 +7,16 @@ import { formatPrice } from '@/lib/currency';
 export default function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/product/${product.id}`} className="group block">
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-[var(--bg-card)] border border-[var(--border)] transition-all duration-300 group-hover:border-[var(--border-hover)] group-hover:shadow-lg group-hover:shadow-black/20">
-        {/* T-shirt mockup background */}
-        <div
-          className={`absolute inset-0 flex items-center justify-center ${
-            product.tshirt_color === 'black' ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'
-          }`}
-        >
-          {/* T-shirt silhouette */}
-          <svg viewBox="0 0 200 220" className="w-[85%] h-[85%] opacity-30">
-            <path
-              d="M60,10 L30,30 L10,70 L35,80 L45,50 L45,210 L155,210 L155,50 L165,80 L190,70 L170,30 L140,10 L120,20 C110,28 90,28 80,20 Z"
-              fill={product.tshirt_color === 'black' ? '#2a2a2a' : '#e0e0e0'}
-              stroke={product.tshirt_color === 'black' ? '#333' : '#ccc'}
-              strokeWidth="1"
-            />
-          </svg>
-          {/* Design overlay */}
-          {product.preview_front_url && (
-            <div className="absolute inset-0 flex items-center justify-center design-protected">
-              <img
-                src={product.preview_front_url}
-                alt=""
-                className="w-[40%] h-auto object-contain no-download"
-                draggable={false}
-                onContextMenu={(e) => e.preventDefault()}
-              />
-            </div>
-          )}
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-white border border-[var(--border)] transition-all duration-300 group-hover:border-[var(--border-hover)] group-hover:shadow-lg group-hover:shadow-black/20">
+        {/* Preview already has the design composited onto the tee */}
+        <div className="absolute inset-0 flex items-center justify-center design-protected">
+          <img
+            src={product.preview_front_url || `/tshirt/front.png`}
+            alt={product.title}
+            className="w-full h-full object-contain no-download"
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+          />
         </div>
 
         {/* Hover overlay */}

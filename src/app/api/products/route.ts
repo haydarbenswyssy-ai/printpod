@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Security: a seller can only submit 'draft' or 'pending'. Only an admin
+    // may set any other status. This stops sellers self-approving products.
+    const requestedStatus = body.status === 'draft' ? 'draft' : 'pending';
+    const status = user!.role === 'admin' && body.status ? body.status : requestedStatus;
+
     const productData = {
       seller_id: user!.sub,
       title: body.title,
@@ -83,7 +88,7 @@ export async function POST(req: NextRequest) {
       category: body.category || 'Graphic Art',
       tags: body.tags || [],
       sizes: body.sizes || ['S', 'M', 'L', 'XL'],
-      status: body.status || 'pending',
+      status,
     };
 
     if (isUsingDevDB()) {
