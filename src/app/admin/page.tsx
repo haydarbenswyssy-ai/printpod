@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store';
 import { api } from '@/lib/api';
-import { Users, Package, ShoppingBag, Clock, Check, X, Loader2, Banknote, Trash2 } from 'lucide-react';
+import { Users, Package, ShoppingBag, Clock, Check, X, Loader2, Banknote, Trash2, MessageCircle, Send, ArrowLeft } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
 
-type Tab = 'overview' | 'products' | 'orders' | 'users';
+type Tab = 'overview' | 'products' | 'orders' | 'users' | 'messages';
 const ORDER_FLOW = ['pending', 'confirmed', 'printing', 'shipped', 'delivered'];
 
 export default function AdminPage() {
@@ -22,11 +22,32 @@ export default function AdminPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [productFilter, setProductFilter] = useState<string>('pending');
 
+  // Chat state
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [activeThreadUser, setActiveThreadUser] = useState<any>(null);
+  const [thread, setThread] = useState<any[]>([]);
+  const [replyText, setReplyText] = useState('');
+  const [replySending, setReplySending] = useState(false);
+
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
     if (user.role !== 'admin') { router.push('/'); return; }
     loadData();
   }, [user, tab, productFilter, router]);
+
+  // Poll the open chat thread for new messages
+  useEffect(() => {
+    if (tab !== 'messages' || !activeThreadUser) return;
+    const load = async () => {
+      try {
+        const data = await api.adminGetThread(activeThreadUser.user_id);
+        setThread(data.messages);
+      } catch { /* keep last state */ }
+    };
+    load();
+    const interval = setInterval(load, 6000);
+    return () => clearInterval(interval);
+  }, [tab, activeThreadUser]);
 
   async function loadData() {
     setLoading(true);
@@ -44,6 +65,9 @@ export default function AdminPage() {
       } else if (tab === 'users') {
         const data = await api.adminGetUsers();
         setUsers(data.users);
+      } else if (tab === 'messages') {
+        const data = await api.adminGetConversations();
+        setConversations(data.conversations);
       }
     } catch (err: any) {
       setLoadError(err?.message || 'Failed to load data. Try signing out and back in.');
@@ -73,6 +97,22 @@ export default function AdminPage() {
     loadData();
   }
 
+  async function sendReply() {
+    const body = replyText.trim();
+    if (!body || !activeThreadUser || replySending) return;
+    setReplySending(true);
+    try {
+      await api.adminReply(activeThreadUser.user_id, body);
+      setReplyText('');
+      const data = await api.adminGetThread(activeThreadUser.user_id);
+      setThread(data.messages);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to send');
+    } finally {
+      setReplySending(false);
+    }
+  }
+
   if (!user || user.role !== 'admin') return null;
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -80,6 +120,7 @@ export default function AdminPage() {
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
     { id: 'users', label: 'Users', icon: Users },
+    { id: 'messages', label: 'Messages', icon: MessageCircle },
   ];
 
   return (
@@ -313,6 +354,112 @@ export default function AdminPage() {
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Messages */}
+          {tab === 'messages' && (
+            <div>
+              {!activeThreadUser ? (
+                /* Conversation list */
+                conversations.length === 0 ? (
+                  <div className="text-center py-12 bg-[var(--bg-card)] rounded-2xl border border-[var(--border)]">
+                    <MessageCircle className="w-10 h-10 mx-auto text-[var(--text-muted)] mb-3" />
+                    <p className="text-sm text-[var(--text-muted)]">No conversations yet</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">When sellers message you, they appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {conversations.map((c) => (
+                      <button
+                        key={c.user_id}
+                        onClick={() => { setActiveThreadUser(c); setThread([]); }}
+                        className="w-full flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] hover:border-[var(--accent)]/30 transition-colors text-left"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
+                          <span className="text-black font-bold text-sm">{c.user?.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{c.user?.name} <span className="text-[var(--text-muted)] font-normal">@{c.user?.username}</span></p>
+                          <p className="text-xs text-[var(--text-muted)] truncate">
+                            {c.last_sender === 'admin' && 'You: '}{c.last_message}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          <span className="text-[10px] text-[var(--text-muted)]">
+                            {new Date(c.last_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </span>
+                          {c.unread > 0 && (
+                            <span className="w-5 h-5 bg-[var(--accent)] text-black text-[10px] font-bold flex items-center justify-center rounded-full">
+                              {c.unread}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )
+              ) : (
+                /* Open thread */
+                <div>
+                  <button
+                    onClick={() => { setActiveThreadUser(null); loadData(); }}
+                    className="flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] mb-4 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> All conversations
+                  </button>
+
+                  <div className="flex items-center gap-3 p-3 rounded-t-2xl bg-[var(--bg-elevated)] border border-[var(--border)] border-b-0">
+                    <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center">
+                      <span className="text-black font-bold text-xs">{activeThreadUser.user?.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{activeThreadUser.user?.name}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">@{activeThreadUser.user?.username} · {activeThreadUser.user?.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 p-4 bg-[var(--bg-card)] border border-[var(--border)] overflow-y-auto" style={{ maxHeight: '50vh', minHeight: '250px' }}>
+                    {thread.length === 0 ? (
+                      <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" /></div>
+                    ) : (
+                      thread.map((m) => (
+                        <div key={m.id} className={`flex ${m.sender_role === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                            m.sender_role === 'admin'
+                              ? 'bg-[var(--accent)] text-black rounded-br-md'
+                              : 'bg-[var(--bg-elevated)] border border-[var(--border)] rounded-bl-md'
+                          }`}>
+                            <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                            <p className={`text-[10px] mt-1 ${m.sender_role === 'admin' ? 'text-black/50' : 'text-[var(--text-muted)]'}`}>
+                              {new Date(m.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 p-3 rounded-b-2xl bg-[var(--bg-elevated)] border border-[var(--border)] border-t-0">
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && sendReply()}
+                      placeholder="Reply..."
+                      maxLength={2000}
+                      className="flex-1 px-4 py-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-sm focus:outline-none focus:border-[var(--accent)]"
+                    />
+                    <button
+                      onClick={sendReply}
+                      disabled={!replyText.trim() || replySending}
+                      className="px-4 py-2.5 bg-[var(--accent)] text-black font-semibold rounded-xl hover:bg-[var(--accent-hover)] transition-all disabled:opacity-40"
+                    >
+                      {replySending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

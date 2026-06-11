@@ -3,8 +3,27 @@
 import Link from 'next/link';
 import { Product } from '@/lib/types';
 import { formatPrice } from '@/lib/currency';
+import { useAuthStore } from '@/lib/store';
+import { api } from '@/lib/api';
+import { Trash2 } from 'lucide-react';
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({ product, onDeleted }: { product: Product; onDeleted?: () => void }) {
+  const user = useAuthStore((s) => s.user);
+  const canDelete = user && (user.role === 'admin' || user.id === product.seller_id);
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${product.title}" permanently?`)) return;
+    try {
+      const res = await api.deleteProduct(product.id);
+      if (res.unlisted) alert(res.message);
+    } catch (err: any) {
+      alert(err?.message || 'Delete failed');
+    }
+    onDeleted?.();
+  }
+
   return (
     <Link href={`/product/${product.id}`} className="group block">
       <div className="relative aspect-square overflow-hidden rounded-xl bg-white border border-[var(--border)] transition-all duration-300 group-hover:border-[var(--border-hover)] group-hover:shadow-lg group-hover:shadow-black/20">
@@ -28,6 +47,17 @@ export default function ProductCard({ product }: { product: Product }) {
             {product.category || 'Design'}
           </span>
         </div>
+
+        {/* Admin/owner delete */}
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            title="Delete product"
+            className="absolute top-3 left-3 z-20 p-2 bg-red-500/90 text-white rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow-lg"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Status badge */}
         {product.status === 'pending' && (

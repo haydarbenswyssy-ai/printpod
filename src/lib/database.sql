@@ -70,6 +70,18 @@ CREATE TABLE order_items (
   design_back_url TEXT
 );
 
+-- Messages table (seller/customer <-> admin support chat)
+CREATE TABLE messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  sender_role TEXT NOT NULL CHECK (sender_role IN ('user', 'admin')),
+  body TEXT NOT NULL,
+  read_by_user BOOLEAN DEFAULT FALSE,
+  read_by_admin BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_messages_user ON messages(user_id, created_at);
+
 -- Indexes
 CREATE INDEX idx_products_seller ON products(seller_id);
 CREATE INDEX idx_products_status ON products(status);

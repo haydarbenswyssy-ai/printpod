@@ -50,6 +50,18 @@ export const api = {
   getStore: (username: string) =>
     request<{ store: any; products: any[] }>(`/stores/${username}`),
 
+  // Messages (user <-> admin chat)
+  getMessages: () =>
+    request<{ messages: any[] }>('/messages'),
+  sendMessage: (body: string) =>
+    request<{ message: any }>('/messages', { method: 'POST', body: JSON.stringify({ body }) }),
+  adminGetConversations: () =>
+    request<{ conversations: any[] }>('/admin/messages'),
+  adminGetThread: (userId: string) =>
+    request<{ messages: any[]; user: any }>(`/admin/messages/${userId}`),
+  adminReply: (userId: string, body: string) =>
+    request<{ message: any }>(`/admin/messages/${userId}`, { method: 'POST', body: JSON.stringify({ body }) }),
+
   // Orders
   createOrder: (data: any) =>
     request<{ order: any }>('/orders', { method: 'POST', body: JSON.stringify(data) }),

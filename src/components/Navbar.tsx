@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore, useCartStore } from '@/lib/store';
-import { ShoppingBag, Menu, X, User, LogOut, LayoutDashboard, Store, Plus, Package } from 'lucide-react';
+import { ShoppingBag, Menu, X, User, LogOut, LayoutDashboard, Store, Plus, Package, MessageCircle } from 'lucide-react';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -111,6 +111,13 @@ export default function Navbar() {
                           className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
                         >
                           <Package className="w-4 h-4" /> Orders
+                        </Link>
+                        <Link
+                          href="/messages"
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+                        >
+                          <MessageCircle className="w-4 h-4" /> Messages
                         </Link>
                         {user.role === 'admin' && (
                           <Link
